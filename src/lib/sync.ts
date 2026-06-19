@@ -1,5 +1,6 @@
 /**
- * Sync engine — pushes local data to the Agrowealth API when online
+ * Sync engine — pushes local data to the AgroWealth API when online
+ * Cooperative model: farmers, purchases, dispatches, deliveries
  */
 
 import {
@@ -52,10 +53,12 @@ function getEndpoint(item: SyncQueueItem): string {
   switch (item.type) {
     case 'farmer':
       return '/farmers/register';
-    case 'harvest':
-      return '/supply/log-harvest';
+    case 'purchase':
+      return '/coop/buy';
+    case 'dispatch':
+      return '/coop/dispatch';
     case 'delivery':
-      return '/supply/log-delivery';
+      return '/coop/deliver';
     default:
       return '/';
   }

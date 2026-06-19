@@ -1,6 +1,7 @@
 /**
- * Offline-first IndexedDB storage for field agent data
- * Stores farmers, harvests, deliveries, and sync queue
+ * Offline-first IndexedDB storage for AgroWealth field agents
+ * Cooperative model: farmers → purchases → dispatches → deliveries
+ * Mirrors the real business flow: Buy from farmer → Load truck → Off-taker receipt → Settle
  */
 
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
@@ -11,7 +12,6 @@ import { v4 as uuidv4 } from 'uuid';
 export interface Farmer {
   id: string;
   phone: string;
-  bvn: string;
   fullName: string;
   farmState: string;
   farmLga: string;
@@ -20,42 +20,64 @@ export interface Farmer {
   farmHectares: number;
   cassavaVariety: string;
   registeredAt: string;
-  verified: boolean;
   synced: boolean;
 }
 
-export interface Harvest {
+/** Cooperative BUYS cassava from a farmer */
+export interface Purchase {
   id: string;
   farmerId: string;
+  farmerName: string;
   farmerPhone: string;
-  estimatedKg: number;
+  weightKg: number;
+  pricePerKg: number;
+  totalAmount: number; // weightKg * pricePerKg
   gpsLat: number;
   gpsLng: number;
-  photoDataUrl: string;
-  loggedAt: string;
-  verified: boolean;
+  photoDataUrl?: string;
+  dispatchId?: string | null; // null = available, set when loaded onto truck
+  agentName: string;
+  createdAt: string;
   synced: boolean;
 }
 
+/** Truck loaded with cassava, dispatched to an off-taker */
+export interface Dispatch {
+  id: string;
+  truckId: string;
+  driverName: string;
+  driverPhone: string;
+  offTakerName: string;
+  destination: string;
+  totalWeightKg: number;
+  purchaseIds: string[];
+  status: 'in_transit' | 'delivered' | 'rejected';
+  createdAt: string;
+  synced: boolean;
+}
+
+/** Off-taker (processing company) confirms receipt of a truck */
 export interface Delivery {
   id: string;
-  farmerId: string;
-  farmerPhone: string;
-  actualKg: number;
-  offTakerName: string;
+  dispatchId: string;
   truckId: string;
+  receivedWeightKg: number;
+  accepted: boolean;
+  rejectionReason?: string;
+  offTakerRep: string;
+  sellPricePerKg: number;
+  totalRevenue: number; // receivedWeightKg * sellPricePerKg
   gpsLat: number;
   gpsLng: number;
-  photoDataUrl: string;
-  deliveredAt: string;
-  verified: boolean;
+  photoDataUrl?: string;
+  createdAt: string;
   synced: boolean;
 }
 
 export interface SyncQueueItem {
   id: string;
-  type: 'farmer' | 'harvest' | 'delivery';
-  action: 'create' | 'update' | 'verify';
+  type: 'farmer' | 'purchase' | 'dispatch' | 'delivery';
+  action: 'create' | 'update';
   data: Record<string, unknown>;
   createdAt: string;
   retries: number;
@@ -69,15 +91,20 @@ interface AgrowealthDB extends DBSchema {
     value: Farmer;
     indexes: { 'by-phone': string; 'by-state': string };
   };
-  harvests: {
+  purchases: {
     key: string;
-    value: Harvest;
-    indexes: { 'by-farmer': string; 'by-date': string };
+    value: Purchase;
+    indexes: { 'by-farmer': string; 'by-dispatch': string };
+  };
+  dispatches: {
+    key: string;
+    value: Dispatch;
+    indexes: { 'by-status': string };
   };
   deliveries: {
     key: string;
     value: Delivery;
-    indexes: { 'by-farmer': string; 'by-date': string; 'by-truck': string };
+    indexes: { 'by-dispatch': string; 'by-truck': string };
   };
   syncQueue: {
     key: string;
@@ -87,7 +114,7 @@ interface AgrowealthDB extends DBSchema {
 }
 
 const DB_NAME = 'agrowealth-field';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance: IDBPDatabase<AgrowealthDB> | null = null;
 
@@ -96,26 +123,49 @@ export async function getDB(): Promise<IDBPDatabase<AgrowealthDB>> {
 
   dbInstance = await openDB<AgrowealthDB>(DB_NAME, DB_VERSION, {
     upgrade(db) {
-      // Farmers store
-      const farmerStore = db.createObjectStore('farmers', { keyPath: 'id' });
-      farmerStore.createIndex('by-phone', 'phone');
-      farmerStore.createIndex('by-state', 'farmState');
+      // Farmers (kept from v1)
+      if (!db.objectStoreNames.contains('farmers')) {
+        const f = db.createObjectStore('farmers', { keyPath: 'id' });
+        f.createIndex('by-phone', 'phone');
+        f.createIndex('by-state', 'farmState');
+      }
 
-      // Harvests store
-      const harvestStore = db.createObjectStore('harvests', { keyPath: 'id' });
-      harvestStore.createIndex('by-farmer', 'farmerId');
-      harvestStore.createIndex('by-date', 'loggedAt');
+      // Remove old v1 stores (cast to any — store names not in new schema)
+      const storeNames = db.objectStoreNames as unknown as string[];
+      const rawDb = db as unknown as { deleteObjectStore: (name: string) => void };
+      if (storeNames.includes('harvests')) {
+        rawDb.deleteObjectStore('harvests');
+      }
+      if (storeNames.includes('deliveries')) {
+        rawDb.deleteObjectStore('deliveries');
+      }
 
-      // Deliveries store
-      const deliveryStore = db.createObjectStore('deliveries', { keyPath: 'id' });
-      deliveryStore.createIndex('by-farmer', 'farmerId');
-      deliveryStore.createIndex('by-date', 'deliveredAt');
-      deliveryStore.createIndex('by-truck', 'truckId');
+      // v2: Purchases (replaces harvests)
+      if (!db.objectStoreNames.contains('purchases')) {
+        const p = db.createObjectStore('purchases', { keyPath: 'id' });
+        p.createIndex('by-farmer', 'farmerId');
+        p.createIndex('by-dispatch', 'dispatchId');
+      }
 
-      // Sync queue
-      const syncStore = db.createObjectStore('syncQueue', { keyPath: 'id' });
-      syncStore.createIndex('by-type', 'type');
-      syncStore.createIndex('by-created', 'createdAt');
+      // v2: Dispatches (new)
+      if (!db.objectStoreNames.contains('dispatches')) {
+        const d = db.createObjectStore('dispatches', { keyPath: 'id' });
+        d.createIndex('by-status', 'status');
+      }
+
+      // v2: Deliveries (recreated with new indexes)
+      if (!db.objectStoreNames.contains('deliveries')) {
+        const del = db.createObjectStore('deliveries', { keyPath: 'id' });
+        del.createIndex('by-dispatch', 'dispatchId');
+        del.createIndex('by-truck', 'truckId');
+      }
+
+      // Sync queue (kept from v1)
+      if (!db.objectStoreNames.contains('syncQueue')) {
+        const s = db.createObjectStore('syncQueue', { keyPath: 'id' });
+        s.createIndex('by-type', 'type');
+        s.createIndex('by-created', 'createdAt');
+      }
     },
   });
 
@@ -125,26 +175,18 @@ export async function getDB(): Promise<IDBPDatabase<AgrowealthDB>> {
 // ── Farmer Operations ─────────────────────────────────────────────────────
 
 export async function registerFarmer(
-  data: Omit<Farmer, 'id' | 'registeredAt' | 'verified' | 'synced'>
+  data: Omit<Farmer, 'id' | 'registeredAt' | 'synced'>
 ): Promise<Farmer> {
   const db = await getDB();
   const farmer: Farmer = {
     ...data,
     id: uuidv4(),
     registeredAt: new Date().toISOString(),
-    verified: false,
     synced: false,
   };
-
   await db.put('farmers', farmer);
   await addToSyncQueue('farmer', 'create', farmer as unknown as Record<string, unknown>);
-
   return farmer;
-}
-
-export async function getFarmer(id: string): Promise<Farmer | undefined> {
-  const db = await getDB();
-  return db.get('farmers', id);
 }
 
 export async function getFarmerByPhone(phone: string): Promise<Farmer | undefined> {
@@ -157,65 +199,105 @@ export async function getAllFarmers(): Promise<Farmer[]> {
   return db.getAll('farmers');
 }
 
-export async function getUnsyncedFarmers(): Promise<Farmer[]> {
-  const db = await getDB();
-  const all = await db.getAll('farmers');
-  return all.filter(f => !f.synced);
-}
+// ── Purchase Operations (Buy from farmer) ─────────────────────────────────
 
-// ── Harvest Operations ────────────────────────────────────────────────────
-
-export async function logHarvest(
-  data: Omit<Harvest, 'id' | 'loggedAt' | 'verified' | 'synced'>
-): Promise<Harvest> {
+export async function logPurchase(
+  data: Omit<Purchase, 'id' | 'createdAt' | 'synced' | 'totalAmount' | 'dispatchId'>
+): Promise<Purchase> {
   const db = await getDB();
-  const harvest: Harvest = {
+  const totalAmount = data.weightKg * data.pricePerKg;
+  const purchase: Purchase = {
     ...data,
     id: uuidv4(),
-    loggedAt: new Date().toISOString(),
-    verified: false,
+    totalAmount,
+    dispatchId: null,
+    createdAt: new Date().toISOString(),
     synced: false,
   };
-
-  await db.put('harvests', harvest);
-  await addToSyncQueue('harvest', 'create', harvest as unknown as Record<string, unknown>);
-
-  return harvest;
+  await db.put('purchases', purchase);
+  await addToSyncQueue('purchase', 'create', purchase as unknown as Record<string, unknown>);
+  return purchase;
 }
 
-export async function getHarvestsByFarmer(farmerId: string): Promise<Harvest[]> {
+export async function getAvailablePurchases(): Promise<Purchase[]> {
   const db = await getDB();
-  return db.getAllFromIndex('harvests', 'by-farmer', farmerId);
+  const all = await db.getAll('purchases');
+  return all
+    .filter((p) => !p.dispatchId)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-export async function getAllHarvests(): Promise<Harvest[]> {
+export async function getAllPurchases(): Promise<Purchase[]> {
   const db = await getDB();
-  return db.getAll('harvests');
+  return db.getAll('purchases');
 }
 
-// ── Delivery Operations ───────────────────────────────────────────────────
+async function assignPurchasesToDispatch(dispatchId: string, purchaseIds: string[]): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction('purchases', 'readwrite');
+  for (const pid of purchaseIds) {
+    const purchase = await tx.store.get(pid);
+    if (purchase) {
+      purchase.dispatchId = dispatchId;
+      await tx.store.put(purchase);
+    }
+  }
+  await tx.done;
+}
+
+// ── Dispatch Operations (Load truck, send to off-taker) ───────────────────
+
+export async function createDispatch(
+  data: Omit<Dispatch, 'id' | 'createdAt' | 'synced' | 'status'>
+): Promise<Dispatch> {
+  const db = await getDB();
+  const dispatch: Dispatch = {
+    ...data,
+    id: uuidv4(),
+    status: 'in_transit',
+    createdAt: new Date().toISOString(),
+    synced: false,
+  };
+  await db.put('dispatches', dispatch);
+  await assignPurchasesToDispatch(dispatch.id, dispatch.purchaseIds);
+  await addToSyncQueue('dispatch', 'create', dispatch as unknown as Record<string, unknown>);
+  return dispatch;
+}
+
+export async function getDispatchesByStatus(status?: Dispatch['status']): Promise<Dispatch[]> {
+  const db = await getDB();
+  const all = await db.getAll('dispatches');
+  const filtered = status ? all.filter((d) => d.status === status) : all;
+  return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+async function updateDispatchStatus(dispatchId: string, status: Dispatch['status']): Promise<void> {
+  const db = await getDB();
+  const dispatch = await db.get('dispatches', dispatchId);
+  if (dispatch) {
+    dispatch.status = status;
+    await db.put('dispatches', dispatch);
+  }
+}
+
+// ── Delivery Operations (Off-taker confirms receipt) ──────────────────────
 
 export async function logDelivery(
-  data: Omit<Delivery, 'id' | 'deliveredAt' | 'verified' | 'synced'>
+  data: Omit<Delivery, 'id' | 'createdAt' | 'synced' | 'totalRevenue'>
 ): Promise<Delivery> {
   const db = await getDB();
+  const totalRevenue = data.receivedWeightKg * data.sellPricePerKg;
   const delivery: Delivery = {
     ...data,
     id: uuidv4(),
-    deliveredAt: new Date().toISOString(),
-    verified: false,
+    totalRevenue,
+    createdAt: new Date().toISOString(),
     synced: false,
   };
-
   await db.put('deliveries', delivery);
+  await updateDispatchStatus(delivery.dispatchId, delivery.accepted ? 'delivered' : 'rejected');
   await addToSyncQueue('delivery', 'create', delivery as unknown as Record<string, unknown>);
-
   return delivery;
-}
-
-export async function getDeliveriesByFarmer(farmerId: string): Promise<Delivery[]> {
-  const db = await getDB();
-  return db.getAllFromIndex('deliveries', 'by-farmer', farmerId);
 }
 
 export async function getAllDeliveries(): Promise<Delivery[]> {
@@ -266,28 +348,58 @@ export async function incrementRetry(id: string): Promise<void> {
   }
 }
 
-// ── Stats ─────────────────────────────────────────────────────────────────
+// ── Cycle Stats (Reconciliation + Profit) ─────────────────────────────────
 
-export async function getLocalStats(): Promise<{
-  farmers: number;
-  harvests: number;
-  deliveries: number;
-  pendingSync: number;
-  totalHarvestKg: number;
-  totalDeliveryKg: number;
-}> {
+export interface CycleStats {
+  totalBoughtKg: number;
+  totalBoughtCost: number;
+  totalDispatchedKg: number;
+  activeDispatches: number;
+  totalDeliveredKg: number;
+  totalRevenue: number;
+  weightLossKg: number;
+  weightLossPct: number;
+  estLogistics: number;
+  estProfit: number;
+  farmerCount: number;
+  purchaseCount: number;
+  deliveryCount: number;
+}
+
+export async function getCycleStats(): Promise<CycleStats> {
   const db = await getDB();
+  const [purchases, dispatches, deliveries, farmers] = await Promise.all([
+    db.getAll('purchases'),
+    db.getAll('dispatches'),
+    db.getAll('deliveries'),
+    db.getAll('farmers'),
+  ]);
 
-  const farmers = await db.count('farmers');
-  const harvests = await db.count('harvests');
-  const deliveries = await db.count('deliveries');
-  const pendingSync = await db.count('syncQueue');
+  const totalBoughtKg = purchases.reduce((s, p) => s + p.weightKg, 0);
+  const totalBoughtCost = purchases.reduce((s, p) => s + p.totalAmount, 0);
+  const activeDispatches = dispatches.filter((d) => d.status === 'in_transit').length;
+  const acceptedDeliveries = deliveries.filter((d) => d.accepted);
+  const totalDeliveredKg = acceptedDeliveries.reduce((s, d) => s + d.receivedWeightKg, 0);
+  const totalRevenue = acceptedDeliveries.reduce((s, d) => s + d.totalRevenue, 0);
+  const weightLossKg = totalBoughtKg - totalDeliveredKg;
+  const weightLossPct = totalBoughtKg > 0 ? (weightLossKg / totalBoughtKg) * 100 : 0;
+  // Logistics estimate: ~15% of buy cost (transport, loading, handling)
+  const estLogistics = totalBoughtCost * 0.15;
+  const estProfit = totalRevenue - totalBoughtCost - estLogistics;
 
-  const allHarvests = await db.getAll('harvests');
-  const totalHarvestKg = allHarvests.reduce((sum, h) => sum + h.estimatedKg, 0);
-
-  const allDeliveries = await db.getAll('deliveries');
-  const totalDeliveryKg = allDeliveries.reduce((sum, d) => sum + d.actualKg, 0);
-
-  return { farmers, harvests, deliveries, pendingSync, totalHarvestKg, totalDeliveryKg };
+  return {
+    totalBoughtKg,
+    totalBoughtCost,
+    totalDispatchedKg: dispatches.reduce((s, d) => s + d.totalWeightKg, 0),
+    activeDispatches,
+    totalDeliveredKg,
+    totalRevenue,
+    weightLossKg,
+    weightLossPct,
+    estLogistics,
+    estProfit,
+    farmerCount: farmers.length,
+    purchaseCount: purchases.length,
+    deliveryCount: deliveries.length,
+  };
 }
