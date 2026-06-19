@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+  /* Royal Navy */
   --color-royal-50: #eef0ff;
   --color-royal-100: #dde1ff;
   --color-royal-200: #c2c8ff;
@@ -13,21 +14,100 @@
   --color-royal-900: #181c44;
   --color-royal-950: #0f1028;
 
+  /* Gold */
   --color-gold-400: #d4af37;
   --color-gold-500: #c9a227;
   --color-gold-600: #a68520;
 
+  /* Emerald (agricultural accent) */
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+
+  /* Status */
   --color-green-400: #4ade80;
   --color-green-500: #22c55e;
-  --color-green-900: #14532d;
-
   --color-yellow-400: #facc15;
-  --color-yellow-900: #713f12;
+  --color-red-400: #f87171;
+}
+
+:root {
+  --bg-primary: #0a0b1e;
+  --bg-secondary: #0f1028;
+  --glass-bg: rgba(30, 30, 90, 0.35);
+  --glass-border: rgba(107, 109, 255, 0.12);
+  --glass-border-hover: rgba(107, 109, 255, 0.25);
+  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  --glass-blur: 16px;
 }
 
 body {
-  background-color: var(--color-royal-950);
-  color: white;
-  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: #e8eaf6;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 0px; }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(74, 222, 128, 0.4); }
+  50% { box-shadow: 0 0 16px rgba(74, 222, 128, 0.6); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }
+.animate-slide-up { animation: slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+
+/* Glass card utility */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+  box-shadow: var(--glass-shadow);
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+
+.glass:active {
+  transform: scale(0.98);
+}
+
+/* Input reset */
+input, select, textarea, button {
+  font-family: inherit;
+  -webkit-appearance: none;
+}
+
+input::placeholder {
+  color: rgba(151, 159, 255, 0.4);
+}
+
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23979fff' d='M6 8L0 2l1.41-1.41L6 5.17l4.59-4.58L12 2z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 12px;
+  padding-right: 2rem !important;
 }

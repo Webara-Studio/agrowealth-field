@@ -32,7 +32,7 @@ export default function Home() {
   useEffect(() => {
     loadStats()
 
-    const handleOnline = () => setOnline(true)
+    const handleOnline = () => { setOnline(true); loadStats() }
     const handleOffline = () => setOnline(false)
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
@@ -60,221 +60,401 @@ export default function Home() {
     alert(`Synced: ${result.success} success, ${result.failed} failed`)
   }
 
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'dashboard', label: 'Home', icon: <IconHome /> },
+    { id: 'farmers', label: 'Farmers', icon: <IconUsers /> },
+    { id: 'harvest', label: 'Harvest', icon: <IconWheat /> },
+    { id: 'delivery', label: 'Delivery', icon: <IconTruck /> },
+    { id: 'sync', label: 'Sync', icon: <IconSync /> },
+  ]
+
   return (
-    <>
-      <div className="min-h-screen flex flex-col">
-        {/* Header */}
-        <header className="header-bar">
-          <div className="flex items-center gap-2">
-            <div className="logo-icon">A</div>
-            <span className="font-semibold text-white text-sm">Agrowealth Agent</span>
+    <div className="app-shell">
+      {/* Header */}
+      <header className="app-header">
+        <div className="flex items-center gap-2.5">
+          <div className="logo-mark">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L4 7v10l8 5 8-5V7l-8-5z" stroke="url(#g1)" strokeWidth="2" strokeLinejoin="round"/>
+              <path d="M12 7v10M8 9.5l4 2.5 4-2.5M8 14.5l4-2.5 4 2.5" stroke="url(#g2)" strokeWidth="1.5" strokeLinecap="round"/>
+              <defs>
+                <linearGradient id="g1" x1="0" y1="0" x2="24" y2="24">
+                  <stop stopColor="#34d399"/><stop offset="1" stopColor="#c9a227"/>
+                </linearGradient>
+                <linearGradient id="g2" x1="0" y1="0" x2="24" y2="24">
+                  <stop stopColor="#6ee7b7"/><stop offset="1" stopColor="#d4af37"/>
+                </linearGradient>
+              </defs>
+            </svg>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`status-dot ${online ? 'status-online' : 'status-offline'}`}></span>
-            <span className="text-xs text-royal-200">{online ? 'Online' : 'Offline'}</span>
-            {stats.pendingSync > 0 && (
-              <span className="pending-badge">{stats.pendingSync} pending</span>
-            )}
+          <div>
+            <div className="text-white font-semibold text-sm leading-tight">Agrowealth</div>
+            <div className="text-[10px] text-royal-300 leading-tight">Field Agent</div>
           </div>
-        </header>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className={`status-pill ${online ? 'online' : 'offline'}`}>
+            <span className="status-orb"></span>
+            <span>{online ? 'Online' : 'Offline'}</span>
+          </div>
+          {stats.pendingSync > 0 && (
+            <span className="badge-pending">{stats.pendingSync}</span>
+          )}
+        </div>
+      </header>
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto p-4 pb-20">
-          {tab === 'dashboard' && <DashboardTab stats={stats} onNavigate={setTab} />}
-          {tab === 'farmers' && <FarmersTab onComplete={loadStats} />}
-          {tab === 'harvest' && <HarvestTab onComplete={loadStats} />}
-          {tab === 'delivery' && <DeliveryTab onComplete={loadStats} />}
-          {tab === 'sync' && <SyncTab stats={stats} onSync={handleSync} syncing={syncing} />}
-        </main>
+      {/* Content */}
+      <main className="app-main" key={tab}>
+        {tab === 'dashboard' && <DashboardTab stats={stats} onNavigate={setTab} />}
+        {tab === 'farmers' && <FarmersTab onComplete={loadStats} />}
+        {tab === 'harvest' && <HarvestTab onComplete={loadStats} />}
+        {tab === 'delivery' && <DeliveryTab onComplete={loadStats} />}
+        {tab === 'sync' && <SyncTab stats={stats} onSync={handleSync} syncing={syncing} />}
+      </main>
 
-        {/* Bottom Nav */}
-        <nav className="bottom-nav">
-          {([
-            { id: 'dashboard', label: 'Home', icon: '◉' },
-            { id: 'farmers', label: 'Farmers', icon: '◈' },
-            { id: 'harvest', label: 'Harvest', icon: '◊' },
-            { id: 'delivery', label: 'Delivery', icon: '◇' },
-            { id: 'sync', label: 'Sync', icon: '◎' },
-          ] as const).map(item => (
-            <button
-              key={item.id}
-              onClick={() => setTab(item.id)}
-              className={`nav-btn ${tab === item.id ? 'nav-active' : ''}`}
-            >
-              <div className="text-lg">{item.icon}</div>
-              {item.label}
-            </button>
-          ))}
-        </nav>
-      </div>
+      {/* Bottom Nav */}
+      <nav className="bottom-nav">
+        {tabs.map(item => (
+          <button
+            key={item.id}
+            onClick={() => setTab(item.id)}
+            className={`nav-item ${tab === item.id ? 'active' : ''}`}
+          >
+            <div className="nav-icon">{item.icon}</div>
+            <span className="nav-label">{item.label}</span>
+            {tab === item.id && <div className="nav-indicator"></div>}
+          </button>
+        ))}
+      </nav>
 
       <style jsx>{`
-        .header-bar {
-          background-color: #181c44;
-          border-bottom: 1px solid rgba(42, 42, 120, 0.3);
-          padding: 0.75rem 1rem;
+        .app-shell {
+          min-height: 100vh;
+          min-height: 100dvh;
+          display: flex;
+          flex-direction: column;
+          background:
+            radial-gradient(ellipse 80% 50% at 50% -10%, rgba(74, 76, 255, 0.12), transparent),
+            radial-gradient(ellipse 60% 40% at 80% 100%, rgba(201, 162, 39, 0.06), transparent),
+            var(--bg-primary);
+        }
+        .app-header {
+          padding: 0.875rem 1rem;
           display: flex;
           align-items: center;
           justify-content: space-between;
           position: sticky;
           top: 0;
           z-index: 50;
+          background: rgba(10, 11, 30, 0.7);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border-bottom: 1px solid rgba(107, 109, 255, 0.08);
         }
-        .logo-icon {
-          width: 1.75rem;
-          height: 1.75rem;
-          background-color: #c9a227;
-          border-radius: 0.25rem;
+        .logo-mark {
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+          background: linear-gradient(135deg, rgba(52, 211, 153, 0.15), rgba(201, 162, 39, 0.15));
+          border: 1px solid rgba(107, 109, 255, 0.15);
           display: flex;
           align-items: center;
           justify-content: center;
-          color: #0f1028;
-          font-weight: 700;
-          font-size: 0.75rem;
         }
-        .status-dot {
-          width: 0.5rem;
-          height: 0.5rem;
+        .status-pill {
+          display: flex;
+          align-items: center;
+          gap: 0.375rem;
+          padding: 0.25rem 0.625rem;
           border-radius: 9999px;
+          font-size: 0.6875rem;
+          font-weight: 500;
         }
-        .status-online { background-color: #4ade80; }
-        .status-offline { background-color: #facc15; }
-        .pending-badge {
-          background-color: rgba(113, 63, 18, 0.4);
+        .status-pill.online {
+          background: rgba(16, 185, 129, 0.12);
+          color: #6ee7b7;
+        }
+        .status-pill.offline {
+          background: rgba(250, 204, 21, 0.12);
           color: #facc15;
-          font-size: 0.75rem;
+        }
+        .status-orb {
+          width: 6px;
+          height: 6px;
+          border-radius: 9999px;
+          background: currentColor;
+          animation: pulse-glow 2s ease-in-out infinite;
+        }
+        .badge-pending {
+          background: linear-gradient(135deg, #c9a227, #a68520);
+          color: #0f1028;
+          font-size: 0.6875rem;
+          font-weight: 700;
           padding: 0.125rem 0.5rem;
           border-radius: 9999px;
+          min-width: 18px;
+          text-align: center;
+        }
+        .app-main {
+          flex: 1;
+          overflow-y: auto;
+          padding: 1.25rem 1rem 6rem 1rem;
+          animation: fadeIn 0.25s ease-out;
         }
         .bottom-nav {
           position: fixed;
           bottom: 0;
           left: 0;
           right: 0;
-          background-color: #181c44;
-          border-top: 1px solid rgba(42, 42, 120, 0.3);
           display: flex;
+          background: rgba(10, 11, 30, 0.85);
+          backdrop-filter: blur(24px);
+          -webkit-backdrop-filter: blur(24px);
+          border-top: 1px solid rgba(107, 109, 255, 0.1);
+          padding: 0.5rem 0.25rem calc(0.5rem + env(safe-area-inset-bottom));
+          z-index: 50;
         }
-        .nav-btn {
+        .nav-item {
           flex: 1;
-          padding: 0.75rem;
-          text-align: center;
-          font-size: 0.75rem;
-          color: #979fff;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 2px;
+          padding: 0.5rem 0;
           background: none;
           border: none;
+          color: rgba(151, 159, 255, 0.5);
           cursor: pointer;
+          position: relative;
+          transition: color 0.2s ease;
         }
-        .nav-active {
-          color: #d4af37;
-          background-color: rgba(30, 30, 90, 0.5);
+        .nav-item.active {
+          color: #6ee7b7;
+        }
+        .nav-icon {
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .nav-item.active .nav-icon {
+          transform: translateY(-2px) scale(1.1);
+        }
+        .nav-label {
+          font-size: 0.625rem;
+          font-weight: 500;
+        }
+        .nav-indicator {
+          position: absolute;
+          bottom: 2px;
+          width: 24px;
+          height: 3px;
+          border-radius: 9999px;
+          background: linear-gradient(90deg, #34d399, #6ee7b7);
         }
       `}</style>
-    </>
+    </div>
   )
 }
 
 // ── Dashboard Tab ─────────────────────────────────────────────────────────
 
 function DashboardTab({ stats, onNavigate }: { stats: Stats; onNavigate: (tab: Tab) => void }) {
-  return (
-    <div className="space-y-4">
-      <h1 className="text-lg font-semibold text-white">Dashboard</h1>
+  const harvestProgress = stats.totalHarvestKg > 0
+    ? Math.min(100, (stats.totalDeliveryKg / stats.totalHarvestKg) * 100)
+    : 0
 
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Farmers" value={stats.farmers.toString()} />
-        <StatCard label="Harvests" value={stats.harvests.toString()} />
-        <StatCard label="Deliveries" value={stats.deliveries.toString()} />
-        <StatCard label="Pending Sync" value={stats.pendingSync.toString()} />
+  return (
+    <div className="space-y-5 animate-slide-up">
+      {/* Hero */}
+      <div>
+        <div className="text-royal-300 text-xs font-medium mb-1">Welcome back</div>
+        <div className="text-white text-2xl font-bold tracking-tight">Field Dashboard</div>
       </div>
 
-      <div className="card">
-        <h3 className="text-sm font-medium text-royal-200 mb-2">Volume Summary</h3>
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-royal-300">Harvested</span>
-            <span className="text-white font-medium">{stats.totalHarvestKg.toLocaleString()} kg</span>
+      {/* Hero stat */}
+      <div className="hero-stat">
+        <div className="hero-stat-bg"></div>
+        <div className="relative z-10">
+          <div className="text-royal-200 text-xs uppercase tracking-wider mb-1">Total Volume</div>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-4xl font-extrabold text-white tracking-tight">
+              {(stats.totalHarvestKg / 1000).toFixed(1)}
+            </span>
+            <span className="text-lg font-semibold text-emerald-300">t</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-royal-300">Delivered</span>
-            <span className="text-white font-medium">{stats.totalDeliveryKg.toLocaleString()} kg</span>
+          <div className="text-royal-300 text-xs mt-0.5">harvested this season</div>
+
+          {/* Progress bar */}
+          <div className="mt-4">
+            <div className="flex justify-between text-[10px] text-royal-200 mb-1">
+              <span>Delivered</span>
+              <span>{harvestProgress.toFixed(0)}%</span>
+            </div>
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${harvestProgress}%` }}></div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="card">
-        <h3 className="text-sm font-medium text-royal-200 mb-2">Quick Actions</h3>
-        <div className="grid grid-cols-3 gap-2">
-          <QuickAction emoji="👤" label="Register" onClick={() => onNavigate('farmers')} />
-          <QuickAction emoji="🌾" label="Harvest" onClick={() => onNavigate('harvest')} />
-          <QuickAction emoji="🚛" label="Deliver" onClick={() => onNavigate('delivery')} />
+      {/* Quick Actions */}
+      <div>
+        <div className="text-royal-200 text-xs font-semibold uppercase tracking-wider mb-3">Quick Actions</div>
+        <div className="grid grid-cols-3 gap-2.5">
+          <ActionCard label="Register" sub="New farmer" icon={<IconUsers />} gradient="emerald" onClick={() => onNavigate('farmers')} />
+          <ActionCard label="Harvest" sub="Log crop" icon={<IconWheat />} gradient="gold" onClick={() => onNavigate('harvest')} />
+          <ActionCard label="Deliver" sub="Confirm" icon={<IconTruck />} gradient="blue" onClick={() => onNavigate('delivery')} />
+        </div>
+      </div>
+
+      {/* Stat Grid */}
+      <div>
+        <div className="text-royal-200 text-xs font-semibold uppercase tracking-wider mb-3">Overview</div>
+        <div className="grid grid-cols-2 gap-2.5">
+          <MiniStat label="Farmers" value={stats.farmers} icon={<IconUsers />} color="#6ee7b7" />
+          <MiniStat label="Harvests" value={stats.harvests} icon={<IconWheat />} color="#d4af37" />
+          <MiniStat label="Deliveries" value={stats.deliveries} icon={<IconTruck />} color="#6b6dff" />
+          <MiniStat label="Pending" value={stats.pendingSync} icon={<IconSync />} color="#facc15" />
+        </div>
+      </div>
+
+      {/* Delivery summary */}
+      <div className="glass p-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-white font-semibold text-sm">Volume Summary</span>
+          <span className="text-[10px] text-royal-300 uppercase tracking-wider">kg</span>
+        </div>
+        <div className="space-y-2.5">
+          <div className="flex justify-between items-center">
+            <span className="text-royal-300 text-sm flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              Harvested
+            </span>
+            <span className="text-white font-bold text-sm">{stats.totalHarvestKg.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-royal-300 text-sm flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-gold-400"></span>
+              Delivered
+            </span>
+            <span className="text-white font-bold text-sm">{stats.totalDeliveryKg.toLocaleString()}</span>
+          </div>
         </div>
       </div>
 
       <style jsx>{`
-        .card {
-          background-color: rgba(24, 28, 68, 0.6);
-          border: 1px solid rgba(42, 42, 120, 0.3);
-          border-radius: 0.75rem;
-          padding: 1.25rem;
+        .hero-stat {
+          position: relative;
+          border-radius: 1.25rem;
+          padding: 1.5rem;
+          overflow: hidden;
+          border: 1px solid rgba(107, 109, 255, 0.15);
+        }
+        .hero-stat-bg {
+          position: absolute;
+          inset: 0;
+          background:
+            linear-gradient(135deg, rgba(52, 211, 153, 0.08), rgba(74, 76, 255, 0.12)),
+            rgba(24, 28, 68, 0.4);
+        }
+        .progress-track {
+          height: 6px;
+          background: rgba(107, 109, 255, 0.15);
+          border-radius: 9999px;
+          overflow: hidden;
+        }
+        .progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, #34d399, #6ee7b7);
+          border-radius: 9999px;
+          transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+          box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
         }
       `}</style>
     </div>
   )
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function ActionCard({ label, sub, icon, gradient, onClick }: {
+  label: string; sub: string; icon: React.ReactNode; gradient: string; onClick: () => void
+}) {
   return (
-    <div className="stat-card">
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
+    <button onClick={onClick} className="action-card group">
+      <div className={`action-icon ${gradient}`}>{icon}</div>
+      <div className="text-white text-xs font-semibold mt-2">{label}</div>
+      <div className="text-royal-300 text-[10px]">{sub}</div>
       <style jsx>{`
-        .stat-card {
-          background-color: rgba(24, 28, 68, 0.6);
-          border: 1px solid rgba(42, 42, 120, 0.3);
-          border-radius: 0.75rem;
-          padding: 1rem;
-        }
-        .stat-label {
-          font-size: 0.75rem;
-          color: #979fff;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-        .stat-value {
-          font-size: 1.5rem;
-          font-weight: 700;
-          color: white;
-          margin-top: 0.25rem;
-        }
-      `}</style>
-    </div>
-  )
-}
-
-function QuickAction({ emoji, label, onClick }: { emoji: string; label: string; onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="quick-action">
-      <div className="text-2xl">{emoji}</div>
-      <div className="text-xs text-royal-200 mt-1">{label}</div>
-      <style jsx>{`
-        .quick-action {
-          background-color: rgba(30, 30, 90, 0.5);
-          border: 1px solid rgba(42, 42, 120, 0.3);
-          border-radius: 0.5rem;
-          padding: 0.75rem;
-          text-align: center;
+        .action-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 0.875rem 0.5rem;
+          background: rgba(24, 28, 68, 0.35);
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(107, 109, 255, 0.1);
+          border-radius: 0.875rem;
           cursor: pointer;
-          transition: background-color 0.2s;
+          transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
         }
-        .quick-action:hover {
-          background-color: rgba(50, 51, 149, 0.6);
+        .action-card:hover {
+          border-color: rgba(107, 109, 255, 0.25);
+          transform: translateY(-2px);
         }
-        .quick-action:active {
-          transform: scale(0.97);
+        .action-card:active {
+          transform: scale(0.96);
+        }
+        .action-icon {
+          width: 38px;
+          height: 38px;
+          border-radius: 0.75rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .action-icon.emerald {
+          background: linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(16, 185, 129, 0.1));
+          color: #34d399;
+        }
+        .action-icon.gold {
+          background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(201, 162, 39, 0.1));
+          color: #d4af37;
+        }
+        .action-icon.blue {
+          background: linear-gradient(135deg, rgba(107, 109, 255, 0.2), rgba(74, 76, 255, 0.1));
+          color: #6b6dff;
         }
       `}</style>
     </button>
+  )
+}
+
+function MiniStat({ label, value, icon, color }: {
+  label: string; value: number; icon: React.ReactNode; color: string
+}) {
+  return (
+    <div className="glass p-3 flex items-center gap-3">
+      <div className="mini-icon" style={{ background: `${color}1a`, color }}>
+        {icon}
+      </div>
+      <div>
+        <div className="text-white font-bold text-lg leading-none">{value}</div>
+        <div className="text-royal-300 text-[10px] uppercase tracking-wider mt-1">{label}</div>
+      </div>
+      <style jsx>{`
+        .mini-icon {
+          width: 32px;
+          height: 32px;
+          border-radius: 0.625rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+      `}</style>
+    </div>
   )
 }
 
@@ -324,98 +504,30 @@ function FarmersTab({ onComplete }: { onComplete: () => void }) {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-lg font-semibold text-white">Register Farmer</h1>
+    <div className="space-y-4 animate-slide-up">
+      <PageHeader icon={<IconUsers />} title="Register Farmer" subtitle="Onboard a new cooperative member" />
 
-      <div className="space-y-3">
-        <Field label="Phone Number *" value={form.phone} onChange={v => setForm({ ...form, phone: v })} placeholder="+234XXXXXXXXXX" />
-        <Field label="BVN" value={form.bvn} onChange={v => setForm({ ...form, bvn: v })} placeholder="12345678901" />
-        <Field label="Full Name *" value={form.fullName} onChange={v => setForm({ ...form, fullName: v })} placeholder="John Doe" />
+      <div className="glass p-5 space-y-4">
+        <FormField label="Phone Number" required value={form.phone} onChange={v => setForm({ ...form, phone: v })} placeholder="+234 801 234 5678" type="tel" />
+        <FormField label="BVN" value={form.bvn} onChange={v => setForm({ ...form, bvn: v })} placeholder="12345678901" />
+        <FormField label="Full Name" required value={form.fullName} onChange={v => setForm({ ...form, fullName: v })} placeholder="John Doe" />
 
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-royal-300 block mb-1">State</label>
-            <select
-              value={form.farmState}
-              onChange={e => setForm({ ...form, farmState: e.target.value })}
-              className="form-input"
-            >
-              <option value="Benue">Benue</option>
-              <option value="Niger">Niger</option>
-              <option value="Nasarawa">Nasarawa</option>
-              <option value="Oyo">Oyo</option>
-              <option value="Ogun">Ogun</option>
-            </select>
-          </div>
-          <Field label="LGA" value={form.farmLga} onChange={v => setForm({ ...form, farmLga: v })} placeholder="Makurdi" />
+          <SelectField label="State" value={form.farmState} onChange={v => setForm({ ...form, farmState: v })}
+            options={['Benue', 'Niger', 'Nasarawa', 'Oyo', 'Ogun', 'Cross River', 'Kogi']} />
+          <FormField label="LGA" value={form.farmLga} onChange={v => setForm({ ...form, farmLga: v })} placeholder="Makurdi" />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Hectares" value={form.farmHectares} onChange={v => setForm({ ...form, farmHectares: v })} placeholder="5" />
-          <div>
-            <label className="text-xs text-royal-300 block mb-1">Cassava Variety</label>
-            <select
-              value={form.cassavaVariety}
-              onChange={e => setForm({ ...form, cassavaVariety: e.target.value })}
-              className="form-input"
-            >
-              <option value="TME 419">TME 419</option>
-              <option value="TMS 30572">TMS 30572</option>
-              <option value="TMS 4(2)1425">TMS 4(2)1425</option>
-              <option value="Local">Local</option>
-            </select>
-          </div>
+          <FormField label="Hectares" value={form.farmHectares} onChange={v => setForm({ ...form, farmHectares: v })} placeholder="5" type="number" />
+          <SelectField label="Variety" value={form.cassavaVariety} onChange={v => setForm({ ...form, cassavaVariety: v })}
+            options={['TME 419', 'TMS 30572', 'TMS 4(2)1425', 'Local']} />
         </div>
 
-        {gps && (
-          <div className="gps-badge">
-            GPS: {gps.lat.toFixed(6)}, {gps.lng.toFixed(6)}
-          </div>
-        )}
+        {gps && <GPSBadge lat={gps.lat} lng={gps.lng} />}
 
-        <button
-          onClick={handleSubmit}
-          disabled={status === 'gps' || status === 'saving'}
-          className={`btn-gold ${status === 'gps' || status === 'saving' ? 'opacity-50' : ''}`}
-        >
-          {status === 'gps' ? 'Getting GPS...' :
-           status === 'saving' ? 'Saving...' :
-           status === 'done' ? '✓ Registered!' :
-           'Register Farmer'}
-        </button>
+        <SubmitButton status={status} onClick={handleSubmit} label="Register Farmer" loadingText={['Getting GPS...', 'Saving...']} />
       </div>
-
-      <style jsx>{`
-        .form-input {
-          width: 100%;
-          background-color: #1e1e5a;
-          border: 1px solid rgba(42, 42, 120, 0.5);
-          border-radius: 0.5rem;
-          padding: 0.5rem 0.75rem;
-          font-size: 0.875rem;
-          color: white;
-        }
-        .gps-badge {
-          background-color: rgba(20, 83, 45, 0.2);
-          border: 1px solid rgba(74, 222, 128, 0.3);
-          border-radius: 0.5rem;
-          padding: 0.75rem;
-          font-size: 0.75rem;
-          color: #86efac;
-        }
-        .btn-gold {
-          width: 100%;
-          background-color: #c9a227;
-          color: #0f1028;
-          font-weight: 600;
-          padding: 0.75rem;
-          border-radius: 0.5rem;
-          border: none;
-          cursor: pointer;
-          transition: background-color 0.2s;
-        }
-        .btn-gold:hover { background-color: #d4af37; }
-      `}</style>
     </div>
   )
 }
@@ -443,7 +555,6 @@ function HarvestTab({ onComplete }: { onComplete: () => void }) {
       const dataUrl = await capturePhoto()
       setPhoto(dataUrl)
 
-      // Resolve farmer by phone
       const farmer = await getFarmerByPhone(phone)
       if (!farmer) {
         alert('Farmer not found. Please register them first.')
@@ -475,56 +586,20 @@ function HarvestTab({ onComplete }: { onComplete: () => void }) {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-lg font-semibold text-white">Log Harvest</h1>
+    <div className="space-y-4 animate-slide-up">
+      <PageHeader icon={<IconWheat />} title="Log Harvest" subtitle="Record estimated crop yield" />
 
-      <Field label="Farmer Phone *" value={phone} onChange={setPhone} placeholder="+234XXXXXXXXXX" />
-      <Field label="Estimated Weight (kg) *" value={kg} onChange={setKg} placeholder="5000" />
+      <div className="glass p-5 space-y-4">
+        <FormField label="Farmer Phone" required value={phone} onChange={setPhone} placeholder="+234 801 234 5678" type="tel" />
+        <FormField label="Estimated Weight (kg)" required value={kg} onChange={setKg} placeholder="5000" type="number" />
 
-      {photo && (
-        <div className="rounded-lg overflow-hidden bg-royal-800">
-          <img src={photo} alt="Harvest" className="w-full h-40 object-cover" />
-        </div>
-      )}
+        {photo && <PhotoPreview src={photo} alt="Harvest" />}
+        {gps && <GPSBadge lat={gps.lat} lng={gps.lng} />}
 
-      {gps && (
-        <div className="gps-badge">
-          GPS: {gps.lat.toFixed(6)}, {gps.lng.toFixed(6)}
-        </div>
-      )}
-
-      <button
-        onClick={handleSubmit}
-        disabled={status === 'gps' || status === 'photo' || status === 'saving'}
-        className={`btn-gold ${(status === 'gps' || status === 'photo' || status === 'saving') ? 'opacity-50' : ''}`}
-      >
-        {status === 'gps' ? 'Getting GPS...' :
-         status === 'photo' ? 'Take Photo...' :
-         status === 'saving' ? 'Saving...' :
-         status === 'done' ? '✓ Logged!' :
-         'Log Harvest'}
-      </button>
-
-      <style jsx>{`
-        .gps-badge {
-          background-color: rgba(20, 83, 45, 0.2);
-          border: 1px solid rgba(74, 222, 128, 0.3);
-          border-radius: 0.5rem;
-          padding: 0.75rem;
-          font-size: 0.75rem;
-          color: #86efac;
-        }
-        .btn-gold {
-          width: 100%;
-          background-color: #c9a227;
-          color: #0f1028;
-          font-weight: 600;
-          padding: 0.75rem;
-          border-radius: 0.5rem;
-          border: none;
-          cursor: pointer;
-        }
-      `}</style>
+        <SubmitButton status={status} onClick={handleSubmit} label="Log Harvest"
+          loadingText={['Getting GPS...', 'Take Photo...', 'Saving...']}
+          extraStates={['photo']} />
+      </div>
     </div>
   )
 }
@@ -553,7 +628,6 @@ function DeliveryTab({ onComplete }: { onComplete: () => void }) {
       const photoUrl = await capturePhoto()
       setPhoto(photoUrl)
 
-      // Resolve farmer by phone
       const farmer = await getFarmerByPhone(form.farmerPhone)
       if (!farmer) {
         alert('Farmer not found. Please register them first.')
@@ -586,58 +660,22 @@ function DeliveryTab({ onComplete }: { onComplete: () => void }) {
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-lg font-semibold text-white">Log Delivery</h1>
+    <div className="space-y-4 animate-slide-up">
+      <PageHeader icon={<IconTruck />} title="Log Delivery" subtitle="Confirm crop delivery to off-taker" />
 
-      <Field label="Farmer Phone *" value={form.farmerPhone} onChange={v => setForm({ ...form, farmerPhone: v })} placeholder="+234XXXXXXXXXX" />
-      <Field label="Actual Weight (kg) *" value={form.actualKg} onChange={v => setForm({ ...form, actualKg: v })} placeholder="35000" />
-      <Field label="Off-Taker *" value={form.offTakerName} onChange={v => setForm({ ...form, offTakerName: v })} placeholder="Pure Biotech" />
-      <Field label="Truck ID *" value={form.truckId} onChange={v => setForm({ ...form, truckId: v })} placeholder="TRK-001" />
+      <div className="glass p-5 space-y-4">
+        <FormField label="Farmer Phone" required value={form.farmerPhone} onChange={v => setForm({ ...form, farmerPhone: v })} placeholder="+234 801 234 5678" type="tel" />
+        <FormField label="Actual Weight (kg)" required value={form.actualKg} onChange={v => setForm({ ...form, actualKg: v })} placeholder="35000" type="number" />
+        <FormField label="Off-Taker" value={form.offTakerName} onChange={v => setForm({ ...form, offTakerName: v })} placeholder="Pure Biotech" />
+        <FormField label="Truck ID" value={form.truckId} onChange={v => setForm({ ...form, truckId: v })} placeholder="TRK-001" />
 
-      {photo && (
-        <div className="rounded-lg overflow-hidden bg-royal-800">
-          <img src={photo} alt="Delivery" className="w-full h-40 object-cover" />
-        </div>
-      )}
+        {photo && <PhotoPreview src={photo} alt="Delivery" />}
+        {gps && <GPSBadge lat={gps.lat} lng={gps.lng} />}
 
-      {gps && (
-        <div className="gps-badge">
-          GPS: {gps.lat.toFixed(6)}, {gps.lng.toFixed(6)}
-        </div>
-      )}
-
-      <button
-        onClick={handleSubmit}
-        disabled={status === 'gps' || status === 'photo' || status === 'saving'}
-        className={`btn-gold ${status === 'gps' || status === 'photo' || status === 'saving' ? 'opacity-50' : ''}`}
-      >
-        {status === 'gps' ? 'Getting GPS...' :
-         status === 'photo' ? 'Take Photo...' :
-         status === 'saving' ? 'Saving...' :
-         status === 'done' ? '✓ Delivered!' :
-         'Log Delivery'}
-      </button>
-
-      <style jsx>{`
-        .gps-badge {
-          background-color: rgba(20, 83, 45, 0.2);
-          border: 1px solid rgba(74, 222, 128, 0.3);
-          border-radius: 0.5rem;
-          padding: 0.75rem;
-          font-size: 0.75rem;
-          color: #86efac;
-        }
-        .btn-gold {
-          width: 100%;
-          background-color: #c9a227;
-          color: #0f1028;
-          font-weight: 600;
-          padding: 0.75rem;
-          border-radius: 0.5rem;
-          border: none;
-          cursor: pointer;
-        }
-      `}</style>
+        <SubmitButton status={status} onClick={handleSubmit} label="Log Delivery"
+          loadingText={['Getting GPS...', 'Take Photo...', 'Saving...']}
+          extraStates={['photo']} />
+      </div>
     </div>
   )
 }
@@ -646,99 +684,363 @@ function DeliveryTab({ onComplete }: { onComplete: () => void }) {
 
 function SyncTab({ stats, onSync, syncing }: { stats: Stats; onSync: () => void; syncing: boolean }) {
   return (
-    <div className="space-y-4">
-      <h1 className="text-lg font-semibold text-white">Sync Data</h1>
+    <div className="space-y-4 animate-slide-up">
+      <PageHeader icon={<IconSync />} title="Sync Data" subtitle="Upload queued records to server" />
 
-      <div className="card space-y-3">
-        <div className="flex justify-between text-sm">
-          <span className="text-royal-300">Pending Items</span>
-          <span className="text-yellow-400 font-medium">{stats.pendingSync}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-royal-300">Total Farmers</span>
-          <span className="text-white font-medium">{stats.farmers}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-royal-300">Total Harvests</span>
-          <span className="text-white font-medium">{stats.harvests}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-royal-300">Total Deliveries</span>
-          <span className="text-white font-medium">{stats.deliveries}</span>
+      {/* Big pending card */}
+      <div className="sync-hero">
+        <div className="sync-hero-bg"></div>
+        <div className="relative z-10 text-center">
+          <div className="text-royal-200 text-xs uppercase tracking-wider mb-2">Pending Records</div>
+          <div className="text-5xl font-extrabold text-white tracking-tight">{stats.pendingSync}</div>
+          <div className="text-royal-300 text-xs mt-1">
+            {stats.pendingSync === 0 ? 'All synced ✓' : 'waiting to upload'}
+          </div>
         </div>
       </div>
 
+      {/* Stats grid */}
+      <div className="grid grid-cols-3 gap-2.5">
+        <SyncStat label="Farmers" value={stats.farmers} />
+        <SyncStat label="Harvests" value={stats.harvests} />
+        <SyncStat label="Deliveries" value={stats.deliveries} />
+      </div>
+
+      {/* Sync button */}
       <button
         onClick={onSync}
         disabled={syncing || stats.pendingSync === 0}
-        className={`btn-primary ${syncing || stats.pendingSync === 0 ? 'opacity-50' : ''}`}
+        className={`sync-btn ${syncing ? 'syncing' : ''} ${stats.pendingSync === 0 ? 'done' : ''}`}
       >
-        {syncing ? 'Syncing...' : `Sync Now (${stats.pendingSync} items)`}
+        {syncing ? (
+          <><span className="sync-spinner"></span> Syncing...</>
+        ) : stats.pendingSync === 0 ? (
+          <>✓ All Caught Up</>
+        ) : (
+          <>Sync Now</>
+        )}
       </button>
 
-      <div className="card">
-        <h3 className="text-sm font-medium text-royal-200 mb-2">How Sync Works</h3>
-        <ul className="text-xs text-royal-300 space-y-1">
-          <li>• Data is saved locally when offline</li>
-          <li>• Auto-syncs every 30 seconds when online</li>
-          <li>• Manual sync button for immediate upload</li>
-          <li>• Failed items retry automatically</li>
+      {/* Info */}
+      <div className="glass p-4">
+        <div className="text-royal-200 text-xs font-semibold uppercase tracking-wider mb-2">How Sync Works</div>
+        <ul className="space-y-1.5">
+          {[
+            'Data saved locally when offline',
+            'Auto-syncs every 30 seconds online',
+            'Manual sync for instant upload',
+            'Failed items retry automatically',
+          ].map((item, i) => (
+            <li key={i} className="text-royal-300 text-xs flex items-center gap-2">
+              <span className="text-emerald-400">•</span> {item}
+            </li>
+          ))}
         </ul>
       </div>
 
       <style jsx>{`
-        .card {
-          background-color: rgba(24, 28, 68, 0.6);
-          border: 1px solid rgba(42, 42, 120, 0.3);
-          border-radius: 0.75rem;
-          padding: 1.25rem;
+        .sync-hero {
+          position: relative;
+          border-radius: 1.25rem;
+          padding: 2rem 1.5rem;
+          overflow: hidden;
+          border: 1px solid rgba(107, 109, 255, 0.15);
         }
-        .btn-primary {
+        .sync-hero-bg {
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(ellipse at 50% 0%, rgba(74, 76, 255, 0.15), transparent 70%),
+            rgba(24, 28, 68, 0.4);
+        }
+        .sync-btn {
           width: 100%;
-          background-color: #323395;
-          color: white;
-          font-weight: 600;
-          padding: 0.75rem;
-          border-radius: 0.5rem;
+          padding: 1rem;
+          border-radius: 1rem;
           border: none;
+          font-weight: 700;
+          font-size: 0.9375rem;
           cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+          background: linear-gradient(135deg, #34d399, #10b981);
+          color: #0a0b1e;
+          box-shadow: 0 4px 20px rgba(16, 185, 129, 0.25);
         }
-        .btn-primary:hover { background-color: #4a4cff; }
+        .sync-btn:active { transform: scale(0.98); }
+        .sync-btn:disabled { opacity: 0.6; }
+        .sync-btn.done {
+          background: rgba(24, 28, 68, 0.4);
+          color: #6ee7b7;
+          border: 1px solid rgba(52, 211, 153, 0.2);
+          box-shadow: none;
+        }
+        .sync-btn.syncing {
+          background: rgba(24, 28, 68, 0.4);
+          color: #979fff;
+          border: 1px solid rgba(107, 109, 255, 0.2);
+          box-shadow: none;
+        }
+        .sync-spinner {
+          width: 16px;
+          height: 16px;
+          border: 2px solid rgba(151, 159, 255, 0.3);
+          border-top-color: #6b6dff;
+          border-radius: 50%;
+          animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
+    </div>
+  )
+}
+
+function SyncStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="glass p-3 text-center">
+      <div className="text-white font-bold text-xl">{value}</div>
+      <div className="text-royal-300 text-[10px] uppercase tracking-wider mt-0.5">{label}</div>
     </div>
   )
 }
 
 // ── Shared Components ─────────────────────────────────────────────────────
 
-function Field({ label, value, onChange, placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string
-}) {
+function PageHeader({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
   return (
-    <div>
-      <label className="text-xs text-royal-300 block mb-1">{label}</label>
-      <input
-        type="text"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="form-input"
-      />
+    <div className="flex items-center gap-3">
+      <div className="page-header-icon">{icon}</div>
+      <div>
+        <div className="text-white font-bold text-lg leading-tight">{title}</div>
+        <div className="text-royal-300 text-xs">{subtitle}</div>
+      </div>
       <style jsx>{`
-        .form-input {
-          width: 100%;
-          background-color: #1e1e5a;
-          border: 1px solid rgba(42, 42, 120, 0.5);
-          border-radius: 0.5rem;
-          padding: 0.5rem 0.75rem;
-          font-size: 0.875rem;
-          color: white;
-        }
-        .form-input:focus {
-          outline: none;
-          border-color: #4a4cff;
+        .page-header-icon {
+          width: 40px;
+          height: 40px;
+          border-radius: 0.75rem;
+          background: linear-gradient(135deg, rgba(52, 211, 153, 0.15), rgba(74, 76, 255, 0.1));
+          border: 1px solid rgba(107, 109, 255, 0.12);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #6ee7b7;
+          flex-shrink: 0;
         }
       `}</style>
     </div>
+  )
+}
+
+function FormField({ label, value, onChange, placeholder, type = 'text', required }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; required?: boolean
+}) {
+  return (
+    <div>
+      <label className="text-[11px] text-royal-200 font-medium block mb-1.5">
+        {label} {required && <span className="text-emerald-400">*</span>}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="form-field"
+      />
+      <style jsx>{`
+        .form-field {
+          width: 100%;
+          background: rgba(15, 16, 40, 0.6);
+          border: 1px solid rgba(107, 109, 255, 0.12);
+          border-radius: 0.75rem;
+          padding: 0.75rem 1rem;
+          font-size: 0.9375rem;
+          color: white;
+          transition: all 0.2s ease;
+        }
+        .form-field:focus {
+          outline: none;
+          border-color: rgba(52, 211, 153, 0.4);
+          background: rgba(15, 16, 40, 0.8);
+          box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.1);
+        }
+      `}</style>
+    </div>
+  )
+}
+
+function SelectField({ label, value, onChange, options }: {
+  label: string; value: string; onChange: (v: string) => void; options: string[]
+}) {
+  return (
+    <div>
+      <label className="text-[11px] text-royal-200 font-medium block mb-1.5">{label}</label>
+      <select value={value} onChange={e => onChange(e.target.value)} className="form-field">
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  )
+}
+
+function GPSBadge({ lat, lng }: { lat: number; lng: number }) {
+  return (
+    <div className="gps-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="12" cy="10" r="3" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+      <span>{lat.toFixed(5)}, {lng.toFixed(5)}</span>
+      <style jsx>{`
+        .gps-badge {
+          display: flex;
+          align-items: center;
+          gap: 0.375rem;
+          background: rgba(16, 185, 129, 0.08);
+          border: 1px solid rgba(52, 211, 153, 0.2);
+          border-radius: 0.625rem;
+          padding: 0.5rem 0.75rem;
+          font-size: 0.75rem;
+          color: #6ee7b7;
+          font-variant-numeric: tabular-nums;
+        }
+      `}</style>
+    </div>
+  )
+}
+
+function PhotoPreview({ src, alt }: { src: string; alt: string }) {
+  return (
+    <div className="photo-preview">
+      <img src={src} alt={alt} />
+      <div className="photo-badge">📷 Verified</div>
+      <style jsx>{`
+        .photo-preview {
+          position: relative;
+          border-radius: 0.875rem;
+          overflow: hidden;
+          border: 1px solid rgba(107, 109, 255, 0.15);
+        }
+        .photo-preview img {
+          width: 100%;
+          height: 160px;
+          object-fit: cover;
+        }
+        .photo-badge {
+          position: absolute;
+          bottom: 0.5rem;
+          right: 0.5rem;
+          background: rgba(10, 11, 30, 0.8);
+          backdrop-filter: blur(8px);
+          color: #6ee7b7;
+          font-size: 0.6875rem;
+          font-weight: 600;
+          padding: 0.25rem 0.625rem;
+          border-radius: 9999px;
+          border: 1px solid rgba(52, 211, 153, 0.2);
+        }
+      `}</style>
+    </div>
+  )
+}
+
+function SubmitButton({ status, onClick, label, loadingText, extraStates = [] }: {
+  status: string; onClick: () => void; label: string; loadingText: string[]; extraStates?: string[]
+}) {
+  const loading = ['gps', 'saving', ...extraStates].includes(status)
+  const statusLabels: Record<string, string> = {
+    gps: loadingText[0],
+    photo: loadingText[1] || 'Take Photo...',
+    saving: loadingText[loadingText.length - 1],
+  }
+
+  return (
+    <>
+      <button
+        onClick={onClick}
+        disabled={loading}
+        className={`submit-btn ${status === 'done' ? 'done' : ''} ${loading ? 'loading' : ''}`}
+      >
+        {status === 'done' ? '✓ Completed' :
+         loading ? (statusLabels[status] || 'Loading...') :
+         label}
+      </button>
+      <style jsx>{`
+        .submit-btn {
+          width: 100%;
+          padding: 1rem;
+          border-radius: 1rem;
+          border: none;
+          font-weight: 700;
+          font-size: 0.9375rem;
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+          background: linear-gradient(135deg, #c9a227, #d4af37);
+          color: #0a0b1e;
+          box-shadow: 0 4px 20px rgba(201, 162, 39, 0.2);
+        }
+        .submit-btn:active { transform: scale(0.98); }
+        .submit-btn.loading {
+          background: rgba(24, 28, 68, 0.4);
+          color: #979fff;
+          border: 1px solid rgba(107, 109, 255, 0.2);
+          box-shadow: none;
+        }
+        .submit-btn.done {
+          background: linear-gradient(135deg, #34d399, #10b981);
+          box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+        }
+      `}</style>
+    </>
+  )
+}
+
+// ── Icons (Inline SVGs — crisp at any size, zero requests) ────────────────
+
+function IconHome() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3v-6a1 1 0 011-1h4a1 1 0 011 1v6h3a1 1 0 001-1V10"/>
+    </svg>
+  )
+}
+
+function IconUsers() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+      <path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+    </svg>
+  )
+}
+
+function IconWheat() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22V8"/><path d="M12 8c0-3 2-5 5-5 0 3-2 5-5 5z"/>
+      <path d="M12 12c0-3 2-5 5-5 0 3-2 5-5 5z"/><path d="M12 16c0-3 2-5 5-5 0 3-2 5-5 5z"/>
+      <path d="M12 8c0-3-2-5-5-5 0 3 2 5 5 5z"/><path d="M12 12c0-3-2-5-5-5 0 3 2 5 5 5z"/>
+      <path d="M12 16c0-3-2-5-5-5 0 3 2 5 5 5z"/>
+    </svg>
+  )
+}
+
+function IconTruck() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/>
+      <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+    </svg>
+  )
+}
+
+function IconSync() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+      <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+    </svg>
   )
 }
