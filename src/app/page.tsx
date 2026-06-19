@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getLocalStats, registerFarmer, logHarvest, logDelivery } from '@/lib/db'
+import { getLocalStats, getFarmerByPhone, registerFarmer, logHarvest, logDelivery } from '@/lib/db'
 import { getCurrentPosition, capturePhoto } from '@/lib/gps'
 import { setupAutoSync } from '@/lib/sync'
 
@@ -80,7 +80,7 @@ export default function Home() {
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto p-4 pb-20">
-          {tab === 'dashboard' && <DashboardTab stats={stats} />}
+          {tab === 'dashboard' && <DashboardTab stats={stats} onNavigate={setTab} />}
           {tab === 'farmers' && <FarmersTab onComplete={loadStats} />}
           {tab === 'harvest' && <HarvestTab onComplete={loadStats} />}
           {tab === 'delivery' && <DeliveryTab onComplete={loadStats} />}
@@ -176,7 +176,7 @@ export default function Home() {
 
 // ── Dashboard Tab ─────────────────────────────────────────────────────────
 
-function DashboardTab({ stats }: { stats: Stats }) {
+function DashboardTab({ stats, onNavigate }: { stats: Stats; onNavigate: (tab: Tab) => void }) {
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-semibold text-white">Dashboard</h1>
@@ -205,9 +205,9 @@ function DashboardTab({ stats }: { stats: Stats }) {
       <div className="card">
         <h3 className="text-sm font-medium text-royal-200 mb-2">Quick Actions</h3>
         <div className="grid grid-cols-3 gap-2">
-          <QuickAction emoji="👤" label="Register" />
-          <QuickAction emoji="🌾" label="Harvest" />
-          <QuickAction emoji="🚛" label="Deliver" />
+          <QuickAction emoji="👤" label="Register" onClick={() => onNavigate('farmers')} />
+          <QuickAction emoji="🌾" label="Harvest" onClick={() => onNavigate('harvest')} />
+          <QuickAction emoji="🚛" label="Deliver" onClick={() => onNavigate('delivery')} />
         </div>
       </div>
 
@@ -252,9 +252,9 @@ function StatCard({ label, value }: { label: string; value: string }) {
   )
 }
 
-function QuickAction({ emoji, label }: { emoji: string; label: string }) {
+function QuickAction({ emoji, label, onClick }: { emoji: string; label: string; onClick: () => void }) {
   return (
-    <div className="quick-action">
+    <button onClick={onClick} className="quick-action">
       <div className="text-2xl">{emoji}</div>
       <div className="text-xs text-royal-200 mt-1">{label}</div>
       <style jsx>{`
@@ -264,9 +264,17 @@ function QuickAction({ emoji, label }: { emoji: string; label: string }) {
           border-radius: 0.5rem;
           padding: 0.75rem;
           text-align: center;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+        .quick-action:hover {
+          background-color: rgba(50, 51, 149, 0.6);
+        }
+        .quick-action:active {
+          transform: scale(0.97);
         }
       `}</style>
-    </div>
+    </button>
   )
 }
 
@@ -422,6 +430,10 @@ function HarvestTab({ onComplete }: { onComplete: () => void }) {
   const [status, setStatus] = useState<'idle' | 'gps' | 'photo' | 'saving' | 'done'>('idle')
 
   async function handleSubmit() {
+    if (!phone || !kg) {
+      alert('Farmer phone and weight are required')
+      return
+    }
     setStatus('gps')
     try {
       const pos = await getCurrentPosition()
@@ -431,9 +443,17 @@ function HarvestTab({ onComplete }: { onComplete: () => void }) {
       const dataUrl = await capturePhoto()
       setPhoto(dataUrl)
 
+      // Resolve farmer by phone
+      const farmer = await getFarmerByPhone(phone)
+      if (!farmer) {
+        alert('Farmer not found. Please register them first.')
+        setStatus('idle')
+        return
+      }
+
       setStatus('saving')
       await logHarvest({
-        farmerId: '',
+        farmerId: farmer.id,
         farmerPhone: phone,
         estimatedKg: parseInt(kg) || 0,
         gpsLat: pos.lat,
@@ -516,24 +536,41 @@ function DeliveryTab({ onComplete }: { onComplete: () => void }) {
     farmerPhone: '', actualKg: '', offTakerName: '', truckId: '',
   })
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null)
-  const [status, setStatus] = useState<'idle' | 'gps' | 'saving' | 'done'>('idle')
+  const [photo, setPhoto] = useState<string | null>(null)
+  const [status, setStatus] = useState<'idle' | 'gps' | 'photo' | 'saving' | 'done'>('idle')
 
   async function handleSubmit() {
+    if (!form.farmerPhone || !form.actualKg) {
+      alert('Farmer phone and weight are required')
+      return
+    }
     setStatus('gps')
     try {
       const pos = await getCurrentPosition()
       setGps({ lat: pos.lat, lng: pos.lng })
 
+      setStatus('photo')
+      const photoUrl = await capturePhoto()
+      setPhoto(photoUrl)
+
+      // Resolve farmer by phone
+      const farmer = await getFarmerByPhone(form.farmerPhone)
+      if (!farmer) {
+        alert('Farmer not found. Please register them first.')
+        setStatus('idle')
+        return
+      }
+
       setStatus('saving')
       await logDelivery({
-        farmerId: '',
+        farmerId: farmer.id,
         farmerPhone: form.farmerPhone,
         actualKg: parseInt(form.actualKg) || 0,
         offTakerName: form.offTakerName,
         truckId: form.truckId,
         gpsLat: pos.lat,
         gpsLng: pos.lng,
-        photoDataUrl: '',
+        photoDataUrl: photoUrl,
       })
 
       setStatus('done')
@@ -541,6 +578,7 @@ function DeliveryTab({ onComplete }: { onComplete: () => void }) {
       setTimeout(() => {
         setStatus('idle')
         setForm({ farmerPhone: '', actualKg: '', offTakerName: '', truckId: '' })
+        setPhoto(null)
       }, 2000)
     } catch (e) {
       alert(`Error: ${e}`)
@@ -556,6 +594,12 @@ function DeliveryTab({ onComplete }: { onComplete: () => void }) {
       <Field label="Off-Taker *" value={form.offTakerName} onChange={v => setForm({ ...form, offTakerName: v })} placeholder="Pure Biotech" />
       <Field label="Truck ID *" value={form.truckId} onChange={v => setForm({ ...form, truckId: v })} placeholder="TRK-001" />
 
+      {photo && (
+        <div className="rounded-lg overflow-hidden bg-royal-800">
+          <img src={photo} alt="Delivery" className="w-full h-40 object-cover" />
+        </div>
+      )}
+
       {gps && (
         <div className="gps-badge">
           GPS: {gps.lat.toFixed(6)}, {gps.lng.toFixed(6)}
@@ -564,10 +608,11 @@ function DeliveryTab({ onComplete }: { onComplete: () => void }) {
 
       <button
         onClick={handleSubmit}
-        disabled={status === 'gps' || status === 'saving'}
-        className={`btn-gold ${status === 'gps' || status === 'saving' ? 'opacity-50' : ''}`}
+        disabled={status === 'gps' || status === 'photo' || status === 'saving'}
+        className={`btn-gold ${status === 'gps' || status === 'photo' || status === 'saving' ? 'opacity-50' : ''}`}
       >
         {status === 'gps' ? 'Getting GPS...' :
+         status === 'photo' ? 'Take Photo...' :
          status === 'saving' ? 'Saving...' :
          status === 'done' ? '✓ Delivered!' :
          'Log Delivery'}
