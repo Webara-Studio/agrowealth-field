@@ -130,13 +130,15 @@ export async function getDB(): Promise<IDBPDatabase<AgrowealthDB>> {
         f.createIndex('by-state', 'farmState');
       }
 
-      // Remove old v1 stores (cast to any — store names not in new schema)
-      const storeNames = db.objectStoreNames as unknown as string[];
-      const rawDb = db as unknown as { deleteObjectStore: (name: string) => void };
-      if (storeNames.includes('harvests')) {
+      // Remove old v1 stores (bypass TS type check — these names aren't in the new schema)
+      const rawDb = db as unknown as {
+        objectStoreNames: { contains: (n: string) => boolean },
+        deleteObjectStore: (n: string) => void,
+      };
+      if (rawDb.objectStoreNames.contains('harvests')) {
         rawDb.deleteObjectStore('harvests');
       }
-      if (storeNames.includes('deliveries')) {
+      if (rawDb.objectStoreNames.contains('deliveries')) {
         rawDb.deleteObjectStore('deliveries');
       }
 
